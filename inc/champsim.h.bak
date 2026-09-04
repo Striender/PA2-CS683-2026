@@ -19,6 +19,8 @@
 #include <string>
 #include <iomanip>
 
+#define DCLIP
+
 // USEFUL MACROS
 //#define DEBUG_PRINT
 #define SANITY_CHECK

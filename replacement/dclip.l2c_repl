@@ -1,0 +1,191 @@
+#include "cache.h"
+
+#define maxRRPV 3
+
+// =============================================
+// DCLIP: Dynamic Code Line Preservation
+// =============================================
+// Extends CLIP with Set Sampling to dynamically decide
+// whether to follow CLIP or baseline SRRIP for data requests.
+//
+// SRRIP baseline:
+//   Miss: insert with RRPV = maxRRPV-1 (far re-reference)
+//   Hit:  update to RRPV = 0 (immediate re-reference)
+//
+// CLIP policy (applied when code pressure is high):
+//   Code miss: RRPV = maxRRPV-1  (far re-reference)
+//   Data miss: RRPV = maxRRPV    (distant re-reference)
+//   Code hit:  RRPV = 0          (immediate re-reference)
+//   Data hit:  no update         (keep current prediction)
+//
+// Set Sampling:
+//   32 sampled sets always follow baseline SRRIP.
+//   Track code/data accesses and misses across the L2.
+//   If code_share = (code_accesses + code_misses) /
+//                   (total_accesses + total_misses) >= theta,
+//   non-sampled sets follow CLIP; otherwise they follow SRRIP.
+// =============================================
+
+#define DCLIP_NUM_SAMPLED_SETS 32
+#define DCLIP_THETA 25  // threshold percentage (25%)
+
+uint32_t l2_rrpv[L2C_SET][L2C_WAY];
+
+// Boolean map: is this set a sampled set?
+bool dclip_is_sampled[L2C_SET];
+
+// Counters for dynamic policy selection
+uint64_t dclip_code_accesses = 0;
+uint64_t dclip_data_accesses = 0;
+uint64_t dclip_code_misses   = 0;
+uint64_t dclip_data_misses   = 0;
+
+// initialize replacement state
+void CACHE::l2c_initialize_replacement()
+{
+    cout << "Initialize DCLIP state for L2C" << endl;
+
+    for (int i = 0; i < L2C_SET; i++) {
+        for (int j = 0; j < L2C_WAY; j++) {
+            l2_rrpv[i][j] = maxRRPV;
+        }
+        dclip_is_sampled[i] = false;
+    }
+
+    // Select DCLIP_NUM_SAMPLED_SETS evenly spaced sampled sets
+    uint32_t stride = L2C_SET / DCLIP_NUM_SAMPLED_SETS;
+    for (int i = 0; i < DCLIP_NUM_SAMPLED_SETS; i++) {
+        dclip_is_sampled[i * stride] = true;
+    }
+
+    dclip_code_accesses = 0;
+    dclip_data_accesses = 0;
+    dclip_code_misses   = 0;
+    dclip_data_misses   = 0;
+}
+
+// find replacement victim
+uint32_t CACHE::l2c_find_victim(uint32_t cpu, uint64_t instr_id, uint32_t set, const BLOCK *current_set, uint64_t ip, uint64_t full_addr, uint32_t type)
+{
+    // look for the maxRRPV line
+    while (1)
+    {
+        for (int i = 0; i < L2C_WAY; i++)
+            if (l2_rrpv[set][i] == maxRRPV)
+                return i;
+
+        for (int i = 0; i < L2C_WAY; i++)
+            l2_rrpv[set][i]++;
+    }
+
+    // WE SHOULD NOT REACH HERE
+    assert(0);
+    return 0;
+}
+
+// Returns true if CLIP policy should be active for non-sampled sets
+bool dclip_should_use_clip()
+{
+    uint64_t total = dclip_code_accesses + dclip_data_accesses
+                   + dclip_code_misses   + dclip_data_misses;
+
+    if (total == 0)
+        return false;
+
+    uint64_t code_total = dclip_code_accesses + dclip_code_misses;
+
+    // Check if code share >= DCLIP_THETA percent
+    return (code_total * 100 >= DCLIP_THETA * total);
+}
+
+// called on every cache hit and cache fill
+void CACHE::l2c_update_replacement_state(uint32_t cpu, uint32_t set, uint32_t way, uint64_t full_addr, uint64_t ip, uint64_t victim_addr, uint32_t type, uint8_t hit, uint8_t isInstruction)
+{
+    string TYPE_NAME;
+    if (type == LOAD)
+        TYPE_NAME = "LOAD";
+    else if (type == RFO)
+        TYPE_NAME = "RFO";
+    else if (type == PREFETCH)
+        TYPE_NAME = "PF";
+    else if (type == WRITEBACK)
+        TYPE_NAME = "WB";
+    else if (type == LOAD_TRANSLATION)
+	TYPE_NAME = "L_TN";
+    else if (type == PREFETCH_TRANSLATION)
+	TYPE_NAME = "P_TN";
+    else if (type == TRANSLATION_FROM_L1D)
+	TYPE_NAME = "TN_L1D";
+    else
+        assert(0);
+
+    if (hit)
+        TYPE_NAME += "_HIT";
+    else
+        TYPE_NAME += "_MISS";
+
+    if ((type == WRITEBACK) && ip)
+        assert(0);
+
+    // uncomment this line to see the L2C accesses
+    // cout << "CPU: " << cpu << "  L2C " << setw(9) << TYPE_NAME << " set: " << setw(5) << set << " way: " << setw(2) << way;
+    // cout << hex << " paddr: " << setw(12) << paddr << " ip: " << setw(8) << ip << " victim_addr: " << victim_addr << dec << endl;
+
+    // ---- Track code/data accesses and misses globally ----
+    if (isInstruction) {
+        dclip_code_accesses++;
+        if (!hit) dclip_code_misses++;
+    } else {
+        dclip_data_accesses++;
+        if (!hit) dclip_data_misses++;
+    }
+
+    // ---- Sampled sets: always follow baseline SRRIP ----
+    if (dclip_is_sampled[set]) {
+        if (hit)
+            l2_rrpv[set][way] = 0;           // immediate re-reference
+        else
+            l2_rrpv[set][way] = maxRRPV - 1;  // long re-reference (SRRIP default)
+        return;
+    }
+
+    // ---- Non-sampled sets: dynamically choose CLIP or SRRIP ----
+    if (dclip_should_use_clip()) {
+        // CLIP policy: preserve code lines
+        if (hit) {
+            if (isInstruction)
+                l2_rrpv[set][way] = 0;  // code hit: immediate re-reference
+            // data hit: no update (keep current RRPV)
+        } else {
+            if (isInstruction)
+                l2_rrpv[set][way] = maxRRPV - 1;  // code miss: far re-reference (RRPV 2)
+            else
+                l2_rrpv[set][way] = maxRRPV;       // data miss: distant re-reference (RRPV 3)
+        }
+    } else {
+        // Baseline SRRIP: no code/data distinction
+        if (hit)
+            l2_rrpv[set][way] = 0;           // immediate re-reference
+        else
+            l2_rrpv[set][way] = maxRRPV - 1;  // long re-reference
+    }
+}
+
+// use this function to print out your own stats at the end of simulation
+void CACHE::l2c_replacement_final_stats()
+{
+    cout << endl;
+    cout << "=== DCLIP Final Stats ===" << endl;
+    cout << "Code accesses: " << dclip_code_accesses << endl;
+    cout << "Data accesses: " << dclip_data_accesses << endl;
+    cout << "Code misses:   " << dclip_code_misses   << endl;
+    cout << "Data misses:   " << dclip_data_misses   << endl;
+    uint64_t total = dclip_code_accesses + dclip_data_accesses
+                   + dclip_code_misses   + dclip_data_misses;
+    if (total > 0) {
+        uint64_t code_total = dclip_code_accesses + dclip_code_misses;
+        cout << "Code share:    " << (code_total * 100 / total) << "%" << endl;
+        cout << "CLIP active:   " << (dclip_should_use_clip() ? "YES" : "NO") << endl;
+    }
+    cout << "=========================" << endl;
+}
