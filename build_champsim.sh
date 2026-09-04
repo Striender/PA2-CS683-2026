@@ -1,12 +1,12 @@
 #!/bin/bash
 
-if [ "$#" -lt 2 ]; then
+if [ "$#" -lt 3 ]; then
     echo
     echo "======================================================================="
     echo " ERROR: Invalid number of arguments supplied."
     echo "======================================================================="
     echo
-    echo "Usage: ./build_champsim.sh <L1d Prefetcher> <L2 Replacement Policy>"
+    echo "Usage: ./build_champsim.sh <L1d Prefetcher> <L2C Replacement Policy> <binary name>"
     echo
     echo "L1d Prefetchers:"
     echo "  1) IP Stride"
@@ -18,7 +18,7 @@ if [ "$#" -lt 2 ]; then
     echo "  2) DCLIP"
     echo
     echo "Example:"
-    echo "  ./build_champsim.sh ip_stride lru"
+    echo "  ./build_champsim.sh ip_stride lru baseline"
     echo
     echo "======================================================================="
     exit 1
@@ -43,6 +43,7 @@ ITLB_REPLACEMENT="lru"   # ITLB replacement
 DTLB_REPLACEMENT="lru"   # DTLB replacement
 STLB_REPLACEMENT="lru"   # STLB replacement
 
+BINARY_NAME=$3
 NUM_CORE=1        # tested up to 8-core system
 
 ############## Some useful macros ###############
@@ -246,7 +247,7 @@ echo "DTLB Replacement: ${DTLB_REPLACEMENT}"
 echo "STLB Replacement: ${STLB_REPLACEMENT}"
 
 echo "Cores: ${NUM_CORE}"
-BINARY_NAME="${BRANCH}-${L1I_PREFETCHER}-${L1D_PREFETCHER}-${L2C_PREFETCHER}-${LLC_PREFETCHER}-${ITLB_PREFETCHER}-${DTLB_PREFETCHER}-${STLB_PREFETCHER}-${BTB_REPLACEMENT}-${L1I_REPLACEMENT}-${L1D_REPLACEMENT}-${L2C_REPLACEMENT}-${LLC_REPLACEMENT}-${ITLB_REPLACEMENT}-${DTLB_REPLACEMENT}-${STLB_REPLACEMENT}-${NUM_CORE}core-${18}"
+BINARY_NAME="${BRANCH}-${L1I_PREFETCHER}-${L1D_PREFETCHER}-${L2C_PREFETCHER}-${LLC_PREFETCHER}-${ITLB_PREFETCHER}-${DTLB_PREFETCHER}-${STLB_PREFETCHER}-${BTB_REPLACEMENT}-${L1I_REPLACEMENT}-${L1D_REPLACEMENT}-${L2C_REPLACEMENT}-${LLC_REPLACEMENT}-${ITLB_REPLACEMENT}-${DTLB_REPLACEMENT}-${STLB_REPLACEMENT}-${NUM_CORE}core-${3}"
 echo "Binary: bin/${BINARY_NAME}"
 echo ""
 mv bin/champsim bin/${BINARY_NAME}

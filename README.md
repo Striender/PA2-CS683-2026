@@ -14,14 +14,16 @@ git clone https://github.com/Striender/PA2-CS683-2026.git
 
 ## Compile
 
-To make things simple, you are only need specify two parameters: L1D prefetcher and L2C replacement policy.
+To make things simple, you are only need specify three parameters: L1D prefetcher, L2C replacement policy and binary name.
 
-For example, `./build_champsim.sh no lru` builds a single-core processor with a hashed perceptron branch predictor, no L1D data prefetcher, and the baseline LRU replacement policy for the L2C.
+For example, `./build_champsim.sh no lru baseline` builds a single-core processor with a hashed perceptron branch predictor, no L1D data prefetcher, and the baseline LRU replacement policy for the L2C.
+
+You can give any name to the binary, these names help you distinguish between the binaries that use same config.
 
 ```bash
-./build_champsim.sh bimodal no lru
+./build_champsim.sh ${L1D_PREFETCHER} ${L2C_REPLACEMENT} ${Binary_name}
 
-./build_champsim.sh ${L1D_PREFETCHER} ${L2C_REPLACEMENT}
+./build_champsim.sh no lru baseline
 ```
 
 ## Run simulation
@@ -32,7 +34,7 @@ For example, `./build_champsim.sh no lru` builds a single-core processor with a 
 ```
 
 Where:
-- `${BINARY}`: ChampSim binary compiled by `build_champsim.sh` (for example, `champsim-no`)
+- `${BINARY}`: ChampSim binary compiled by `build_champsim.sh` (for example, `champsim-no-baseline`)
 - `${N_WARM}`: number of instructions for warmup (50 million)
 - `${N_SIM}`: number of instructions for detailed simulation (50 million)
 - `${TRACE_DIR}`: directory containing the trace (for example, `../traces/`)
