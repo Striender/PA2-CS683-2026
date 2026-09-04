@@ -14,9 +14,9 @@ git clone https://github.com/Striender/PA2-CS683-2026.git
 
 ## Compile
 
-ChampSim takes two parameters: the L1D prefetcher and the L2 replacement policy.
+To make things simple, you are only need specify two parameters: L1D prefetcher and L2C replacement policy.
 
-For example, `./build_champsim.sh no lru` builds a single-core processor with a hashed perceptron branch predictor, no L1 data prefetcher, and the baseline LRU replacement policy for the L2.
+For example, `./build_champsim.sh no lru` builds a single-core processor with a hashed perceptron branch predictor, no L1D data prefetcher, and the baseline LRU replacement policy for the L2C.
 
 ```bash
 ./build_champsim.sh bimodal no lru
