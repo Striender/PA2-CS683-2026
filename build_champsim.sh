@@ -1,34 +1,49 @@
 #!/bin/bash
 
-if [ "$#" -lt 18 ]; then
-    echo "Illegal number of parameters"
-    echo "Usage: ./build_champsim.sh [branch_pred] [l1i_pref] [l1d_pref]
-    [l2c_pref] [llc_pref] [itlb_pref] [dtlb_pref] [stlb_pref] [btb_repl]
-    [l1i_repl] [l1d_repl] [l2c_repl] [llc_repl] [itlb_repl] [dtlb_repl]
-    [stlb_repl] [num_core] [tail_name]"
+if [ "$#" -lt 2 ]; then
+    echo
+    echo "======================================================================="
+    echo " ERROR: Invalid number of arguments supplied."
+    echo "======================================================================="
+    echo
+    echo "Usage: ./build_champsim.sh <L1d Prefetcher> <L2 Replacement Policy>"
+    echo
+    echo "L1d Prefetchers:"
+    echo "  1) IP Stride"
+    echo "  2) PA2 Prefetcher"
+    echo "  3) No Prefetcher"
+    echo
+    echo "L2 Replacement Policies:"
+    echo "  1) LRU"
+    echo "  2) DCLIP"
+    echo
+    echo "Example:"
+    echo "  ./build_champsim.sh ip_stride lru"
+    echo
+    echo "======================================================================="
     exit 1
 fi
 
 # ChampSim configuration
-BRANCH=$1           # branch/*.bpred
-L1I_PREFETCHER=$2   # prefetcher/*.l1i_pref
-L1D_PREFETCHER=$3   # prefetcher/*.l1d_pref
-L2C_PREFETCHER=$4   # prefetcher/*.l2c_pref
-LLC_PREFETCHER=$5   # prefetcher/*.llc_pref
-ITLB_PREFETCHER=$6  # prefetcher/*.itlb_pref
-DTLB_PREFETCHER=$7  # prefetcher/*.dtlb_pref
-STLB_PREFETCHER=$8  # prefetcher/*.stlb_pref
+BRANCH="hashed_perceptron"           # branch/*.bpred
+L1I_PREFETCHER="no"   # prefetcher/*.l1i_pref
+L1D_PREFETCHER=$1   # prefetcher/*.l1d_pref
+L2C_PREFETCHER="no"   # prefetcher/*.l2c_pref
+LLC_PREFETCHER="no"   # prefetcher/*.llc_pref
+ITLB_PREFETCHER="no"  # prefetcher/*.itlb_pref
+DTLB_PREFETCHER="no"  # prefetcher/*.dtlb_pref
+STLB_PREFETCHER="no"  # prefetcher/*.stlb_pref
 
-BTB_REPLACEMENT=$9 	   # prefetcher/*.btb_repl	
-L1I_REPLACEMENT=${10}   # prefetcher/*.l1i_repl
-L1D_REPLACEMENT=${11}   # prefetcher/*.l1d_repl
-L2C_REPLACEMENT=${12}   # prefetcher/*.l2c_repl
-LLC_REPLACEMENT=${13}   # prefetcher/*.llc_repl
-ITLB_REPLACEMENT=${14}  # prefetcher/*.itlb_repl
-DTLB_REPLACEMENT=${15}  # prefetcher/*.dtlb_repl
-STLB_REPLACEMENT=${16}  # prefetcher/*.stlb_repl
+BTB_REPLACEMENT="lru"       # BTB replacement
+L1I_REPLACEMENT="lru"    # L1I replacement
+L1D_REPLACEMENT="lru"    # L1D replacement
+L2C_REPLACEMENT=$2    # L2C replacement
+LLC_REPLACEMENT="lru"    # LLC replacement
+ITLB_REPLACEMENT="lru"   # ITLB replacement
+DTLB_REPLACEMENT="lru"   # DTLB replacement
+STLB_REPLACEMENT="lru"   # STLB replacement
 
-NUM_CORE=${17}         # tested up to 8-core system
+NUM_CORE=1        # tested up to 8-core system
 
 ############## Some useful macros ###############
 BOLD=$(tput bold)
@@ -242,7 +257,7 @@ sed -i.bak 's/\<NUM_CPUS '${NUM_CORE}'\>/NUM_CPUS 1/g' inc/champsim.h
 #sed -i.bak 's/\<DRAM_CHANNELS 2\>/DRAM_CHANNELS 1/g' inc/champsim.h
 #sed -i.bak 's/\<DRAM_CHANNELS_LOG2 1\>/DRAM_CHANNELS_LOG2 0/g' inc/champsim.h
 
-cp branch/bimodal.bpred branch/branch_predictor.cc
+cp branch/hashed_perceptron.bpred branch/branch_predictor.cc
 cp prefetcher/no.l1i_pref prefetcher/l1i_prefetcher.cc
 cp prefetcher/no.l1d_pref prefetcher/l1d_prefetcher.cc
 cp prefetcher/no.l2c_pref prefetcher/l2c_prefetcher.cc
